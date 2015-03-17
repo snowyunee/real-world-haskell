@@ -11,11 +11,8 @@ islast [a] = True
 islast _ = False
 
 -- 3.
--- *Main> lastBugOne [1]
---
--- <interactive>:7:1:
---     Not in scope: ▒▒lastBugOne▒▒
---         Perhaps you meant ▒▒lastButOne▒▒ (line 8)
+-- *Main> lastButOne [1]
+-- *** Exception: e.hs:8:1-58: Non-exhaustive patterns in function lastButOne
 --
 
 
