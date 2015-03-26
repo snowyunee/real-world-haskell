@@ -5,8 +5,8 @@ import Tree
 
 --  1. Write a function that computes the number of elements in a list. To test it, ensure that it gives the same answers as the standard length function. 49 comments
 length' :: [a] -> Int
-length' (x:xs) = 1 + length' xs
 length' [] = 0
+length' (x:xs) = 1 + length' xs
 
 --  2.
 --  Add a type signature for your function to your source file. To test it, load the source file into ghci again.
