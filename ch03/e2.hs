@@ -1,3 +1,4 @@
+import Data.Complex
 import Data.List
 import Data.Function
 import Data.Ord
@@ -56,25 +57,61 @@ height (Node n l r) = 1 + (max (height l) (height r))
 --  9.
 --  Consider three two-dimensional points a, b, and c. If we look at the angle formed by the line segment from a to b and the line segment from b to c, it either turns left, turns right, or forms a straight line. Define a Direction data type that lets you represent these possibilities. 24 comments
 data Direction = DirectionLeft | DirectionRight | DirectionStraight
+  deriving (Show, Eq)
+
 data Point = Point {
-  x :: Double,
-  y :: Double
+  pointX :: Double,
+  pointY :: Double
 } deriving (Show)
 
 --  10.
 --  Write a function that calculates the turn made by three 2D points and returns a Direction. 58 comments
 calcDirection :: Point -> Point -> Point -> Direction
-calcDirection a b c = DirectionLeft
+calcDirection (Point x1 y1) (Point x2 y2) (Point x3 y3) =
+  direction' (x2-x1, y2-y1) (x3-x2, y3-y2)
+  where
+    direction' (x1', y1') (x2', y2')
+      | sinTheta > 0 = DirectionLeft
+      | sinTheta < 0 = DirectionRight
+      | otherwise = DirectionStraight
+      where sinTheta = x1'*y2' - y1'*x2'
 
 
 
 --  11.
---  Define a function that takes a list of 2D points and computes the direction of each successive triple. Given a list of points [a,b,c,d,e], it should begin by computing the turn made by [a,b,c], then the turn made by [b,c,d], then [c,d,e]. Your function should return a list of Direction. 19 comments
+--  Define a function that takes a list of 2D points and computes the direction of each successive triple.
+--  Given a list of points [a,b,c,d,e], it should begin by computing the turn made by [a,b,c], then the turn made by [b,c,d], then [c,d,e].
+--  Your function should return a list of Direction. 19 comments
+calcDirections :: [Point] -> [Direction]
+calcDirections xs = map (uncurry3 calcDirection) ds
+  where
+    uncurry3 f (a,b,c) = f a b c
+    ds = zip3 xs (tail xs) (tail $ tail xs)
 
 
 --  12.
 --  
---  Using the code from the preceding three exercises, implement Graham's scan algorithm for the convex hull of a set of 2D points. You can find good description of what a convex hull. is, and how the Graham scan algorithm should work, on Wikipedia. 61 comments
+--  Using the code from the preceding three exercises, implement Graham's scan algorithm for the convex hull of a set of 2D points.
+--  You can find good description of what a convex hull. is, and how the Graham scan algorithm should work, on Wikipedia. 61 comments
+grahamScan :: [Point] -> [Point]
+
+grahamScan [] = []
+
+grahamScan [x] = []
+
+grahamScan (a:b:[]) = []
+
+grahamScan xs = tail $ map (\(Point x y) -> (Point (x + lx) (y + ly))) convexVectors
+  where
+    (Point lx ly)  = minimumBy (comparing pointY) xs
+    (v0:v1:vs)  = sortBy (comparing angle) vectors
+      where angle (Point x y) = snd $ polar (x :+ y)
+            vectors = map (\(Point x y) -> (Point (x - lx) (y - ly))) xs
+    convexVectors = foldl leftAngle [v1,v0] (vs++[v0])
+      where leftAngle (b:a:xs) c 
+              | calcDirection a b c == DirectionLeft     = (c:b:a:xs)
+              | otherwise                                = leftAngle (a:xs) c
+
 
 
 main = do
@@ -100,4 +137,14 @@ main = do
   print $ height (Node "x" Empty Empty)
   print $ 3
   print $ height (Node "x" (Node "l" Empty Empty) (Node "r" Empty (Node "rr" Empty Empty)))
+  print $ "straight"
+  print $ calcDirection (Point 1 2) (Point 2 3) (Point 3 4)
+  print $ "left"
+  print $ calcDirection (Point 1 2) (Point 2 3) (Point 3 5)
+  print $ "right"
+  print $ calcDirection (Point 1 2) (Point 2 3) (Point 3 3)
+  print $ "s, l, r"
+  print $ calcDirections [(Point 1 2), (Point 2 3), (Point 3 4), (Point 4 6), (Point 6 6)]
+  print $ "[(1.0,2.0),(6.0,7.0),(5.0,-1.0),(2.0,-1.0)]"
+  print $ grahamScan [(Point 1 2), (Point 2 (-1)), (Point 3 4), (Point 5 (-1)), (Point 6 7), (Point 2 2)]
 
