@@ -47,6 +47,29 @@ nest width x = hcat $ best 0 [x]
 
           indent width = Text (replicate width ' ')
 
+nest' :: Int -> Doc -> Doc
+nest' width x = hcat $ best 0 [x]
+    where best col (d:ds) =
+              case d of
+                Empty        -> best col ds
+                Char '{'     -> d : best (col + width) (Line:ds)
+                Char '['     -> d : best (col + width) (Line:ds)
+                Char ']'     -> d : best (col - width) ds
+                Char '}'     -> d : best (col - width) ds
+                Line         -> d : case head ds of
+                                      Char ']' -> indent (col - width) : head ds : best (col- width) (tail ds)
+                                      Char '}' -> indent (col - width) : head ds : best (col- width) (tail ds)
+                                      _        -> indent col : best col ds
+                a `Concat` b -> best col (a:b:ds)
+                a `Union` b  -> best col (b:ds)
+                _            -> d : best col ds
+          best _ _ = [Empty]
+
+          indent width = Text (replicate width ' ')
+
+
+
+
 jvalue = JObject [
            ("snow", JArray [
                             JString "snow 1", 
@@ -73,5 +96,5 @@ jvalue = JObject [
 
 main = do
   putStrLn $ compact $ fill 10 $ renderJValue jvalue
-  putStrLn $ compact $ nest 5 $ renderJValue jvalue
+  putStrLn $ compact $ nest' 5 $ renderJValue jvalue
   
