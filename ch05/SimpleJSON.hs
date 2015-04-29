@@ -1,3 +1,16 @@
+
+module SimpleJSON
+    (
+      JValue(..)
+    , getString
+    , getInt
+    , getDouble
+    , getBool
+    , getObject
+    , getArray
+    , isNull
+    ) where
+
 -- file: ch05/SimpleJSON.hs
 data JValue = JString String
             | JNumber Double
@@ -31,14 +44,3 @@ getArray _          = Nothing
 isNull v            = v == JNull
 
 -- file: ch05/SimpleJSON.hs
-module SimpleJSON
-    (
-      JValue(..)
-    , getString
-    , getInt
-    , getDouble
-    , getBool
-    , getObject
-    , getArray
-    , isNull
-    ) where

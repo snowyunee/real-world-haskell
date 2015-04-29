@@ -1,10 +1,30 @@
 -- file: ch05/PrettyJSON.hs
+
+-- file: ch05/PrettyJSON.hs
+module PrettyJSON
+    (
+      renderJValue
+    ) where
+
+import Numeric (showHex)
+import Data.Char (ord)
+import Data.Bits (shiftR, (.&.))
+
+import SimpleJSON (JValue(..))
+import Prettify (Doc, (<>), char, double, fsep, hcat, punctuate, text,
+                 compact, pretty)
+
 renderJValue :: JValue -> Doc
 renderJValue (JBool True)  = text "true"
 renderJValue (JBool False) = text "false"
 renderJValue JNull         = text "null"
 renderJValue (JNumber num) = double num
 renderJValue (JString str) = string str
+renderJValue (JArray ary) = series '[' ']' renderJValue ary
+renderJValue (JObject obj) = series '{' '}' field obj
+    where field (name,val) = string name
+                          <> text ": "
+                          <> renderJValue val
 
 -- file: ch05/PrettyJSON.hs
 string :: String -> Doc
@@ -54,25 +74,3 @@ series :: Char -> Char -> (a -> Doc) -> [a] -> Doc
 series open close item = enclose open close
                        . fsep . punctuate (char ',') . map item
 
--- file: ch05/PrettyJSON.hs
-renderJValue (JArray ary) = series '[' ']' renderJValue ary
-
--- file: ch05/PrettyJSON.hs
-renderJValue (JObject obj) = series '{' '}' field obj
-    where field (name,val) = string name
-                          <> text ": "
-                          <> renderJValue val
-
--- file: ch05/PrettyJSON.hs
-module PrettyJSON
-    (
-      renderJValue
-    ) where
-
-import Numeric (showHex)
-import Data.Char (ord)
-import Data.Bits (shiftR, (.&.))
-
-import SimpleJSON (JValue(..))
-import Prettify (Doc, (<>), char, double, fsep, hcat, punctuate, text,
-                 compact, pretty)

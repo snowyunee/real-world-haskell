@@ -1,8 +1,4 @@
--- file: ch05/Prettify.hs
-punctuate :: Doc -> [Doc] -> [Doc]
-punctuate p []     = []
-punctuate p [d]    = [d]
-punctuate p (d:ds) = (d <> p) : punctuate p ds
+module Prettify where
 
 -- file: ch05/Prettify.hs
 data Doc = Empty
@@ -66,6 +62,12 @@ flatten (x `Union` _)  = flatten x
 flatten other          = other
 
 -- file: ch05/Prettify.hs
+punctuate :: Doc -> [Doc] -> [Doc]
+punctuate p []     = []
+punctuate p [d]    = [d]
+punctuate p (d:ds) = (d <> p) : punctuate p ds
+
+-- file: ch05/Prettify.hs
 compact :: Doc -> String
 compact x = transform [x]
     where transform [] = ""
@@ -80,8 +82,6 @@ compact x = transform [x]
 
 -- file: ch05/Prettify.hs
 pretty :: Int -> Doc -> String
-
--- file: ch05/Prettify.hs
 pretty width x = best 0 [x]
     where best col (d:ds) =
               case d of
@@ -106,7 +106,7 @@ w `fits` ('\n':_)  = True
 w `fits` (c:cs)    = (w - 1) `fits` cs
 
 -- file: ch05/Prettify.hs
-fill :: Int -> Doc -> Doc
+--fill :: Int -> Doc -> Doc
 
 -- file: ch05/Prettify.hs
-nest :: Int -> Doc -> Doc
+--nest :: Int -> Doc -> Doc
