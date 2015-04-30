@@ -15,7 +15,7 @@ fill width x = hcat $ best 0 [x]
                 a `Concat` b -> best col (a:b:ds)
                 a `Union` b  -> nicest col (best col (a:ds))
                                            (best col (b:ds))
-          best _ _ = [Empty]
+          best col _ = [Text (replicate (width - col) space)]
 
           nicest col a b | (width - least) `fits2` a = a
                          | otherwise                 = b
