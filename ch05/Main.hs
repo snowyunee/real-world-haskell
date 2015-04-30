@@ -1,5 +1,5 @@
 -- file: ch05/Main.hs
-module Main () where
+module Main (main) where
 
 import SimpleJSON
 
