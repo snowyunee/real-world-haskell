@@ -9,7 +9,7 @@ import System.Directory (doesDirectoryExist, doesFileExist,
 import System.FilePath (dropTrailingPathSeparator, splitFileName, (</>))
 
 -- file: ch08/Glob.hs
-import Control.OldException (handle)
+import Control.Exception (handle, SomeException)
 import Control.Monad (forM)
 import GlobRegex (matchesGlob)
 
@@ -49,13 +49,16 @@ doesNameExist name = do
       then return True
       else doesDirectoryExist name
 
+handleAll :: (SomeException -> IO a) -> IO a -> IO a
+handleAll = handle
+
 -- file: ch08/Glob.hs
 listMatches :: FilePath -> String -> IO [String]
 listMatches dirName pat = do
     dirName' <- if null dirName
                 then getCurrentDirectory
                 else return dirName
-    handle (const (return [])) $ do
+    handleAll (const (return [])) $ do
         names <- getDirectoryContents dirName'
         let names' = if isHidden pat
                      then filter isHidden names
