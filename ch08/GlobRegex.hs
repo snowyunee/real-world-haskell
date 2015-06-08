@@ -43,4 +43,4 @@ matchesGlob :: FilePath -> String -> Bool
 name `matchesGlob` pat = name =~ globToRegex pat
 
 -- file: ch08/GlobRegex.hs
-globToRegex' (c:cs) = escape c ++ globToRegex' cs
+--globToRegex' (c:cs) = escape c ++ globToRegex' cs
