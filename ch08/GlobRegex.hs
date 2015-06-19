@@ -3,9 +3,11 @@ module GlobRegex
     (
       globToRegex
     , matchesGlob
+    , matchesGlob'
     ) where
 
 import Text.Regex.Posix ((=~))
+import Data.Char (toLower)
 
 globToRegex :: String -> String
 
@@ -44,3 +46,7 @@ name `matchesGlob` pat = name =~ globToRegex pat
 
 -- file: ch08/GlobRegex.hs
 --globToRegex' (c:cs) = escape c ++ globToRegex' cs
+
+matchesGlob' :: FilePath -> Bool -> String -> Bool
+matchesGlob' pat True name  = name =~ globToRegex pat
+matchesGlob' pat False name = (map toLower name) =~ globToRegex (map toLower pat)

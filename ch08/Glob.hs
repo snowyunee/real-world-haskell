@@ -6,12 +6,13 @@ import System.Directory (doesDirectoryExist, doesFileExist,
                          getCurrentDirectory, getDirectoryContents)
 
 -- file: ch08/Glob.hs
-import System.FilePath (dropTrailingPathSeparator, splitFileName, (</>))
+import System.FilePath (dropTrailingPathSeparator, splitFileName, (</>),
+                        pathSeparator)
 
 -- file: ch08/Glob.hs
 import Control.Exception (handle, SomeException)
 import Control.Monad (forM)
-import GlobRegex (matchesGlob)
+import GlobRegex (matchesGlob, matchesGlob')
 
 -- file: ch08/Glob.hs
 isPattern :: String -> Bool
@@ -52,6 +53,9 @@ doesNameExist name = do
 handleAll :: (SomeException -> IO a) -> IO a -> IO a
 handleAll = handle
 
+isWindows :: Bool
+isWindows = pathSeparator == '\\'
+
 -- file: ch08/Glob.hs
 listMatches :: FilePath -> String -> IO [String]
 listMatches dirName pat = do
@@ -63,7 +67,7 @@ listMatches dirName pat = do
         let names' = if isHidden pat
                      then filter isHidden names
                      else filter (not . isHidden) names
-        return (filter (`matchesGlob` pat) names')
+        return (filter (matchesGlob' pat (not isWindows) ) names')
 
 isHidden ('.':_) = True
 isHidden _       = False

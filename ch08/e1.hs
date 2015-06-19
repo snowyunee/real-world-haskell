@@ -20,16 +20,16 @@
 
 import GlobRegex
 import Text.Regex.Posix ((=~))
-import Data.Char (toLower)
+import System.FilePath (pathSeparator)
 
-matchesGlob' :: FilePath -> String -> Bool -> Bool
-matchesGlob' name pat True  = name =~ globToRegex pat
-matchesGlob' name pat False = (map toLower name) =~ globToRegex (map toLower pat)
+
+isWindows :: Bool
+isWindows = pathSeparator == '\\'
 
 main = do
   print $ "False"
   print $ matchesGlob "KKK" "kkk"
-  print $ "False"
-  print $ matchesGlob' "KKK" "kkk" True
   print $ "True"
-  print $ matchesGlob' "KKK" "kkk" False
+  print $ matchesGlob' "KKK" isWindows "kkk"
+  print $ "False"
+  print $ matchesGlob' "KKK" True "kkk"
