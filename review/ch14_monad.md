@@ -239,13 +239,38 @@ module Logger
 	* value constructor를 노출하지 않는 대신 Logger에 있는 결과와 그 결과가 나오기 까지 남은 log를 가져올 수 있는 함수를 제공한다.
 
 ##### Controlled Escape
+monad typeclass는 monad 를 벗고(unwrap) plain value를 얻을 수 있는 어떤 방법을 제공하지 않는다.
+bind, return 모두 그에 해당하지 않는다. bind는 unwrap하지만, 다시 감싸서 반환해야 한다.
+대부분의 monads는 하나 이상의 runLogger와 같은 함수들을 제공한다. IO는 예외기는 하다. 이는 프로그램 종료시점에 된다.
 
 
 ##### Leaving a Trace
 
+record : logger action안에서 실행됨, 이러한 특별한 접근을 위한 untility들이 필요함.
+
+```hs
+-- file: ch14/Logger.hs
+record :: String -> Logger ()
+```
+```hs
+ghci> let simple = return True :: Logger Bool
+ghci> runLogger simple
+(True,[])
+```
+```hs
+ghci> runLogger (record "hi mom!" >> return 3.1337)
+(3.1337,["hi mom!"])
+```
 
 ##### Using the Logger Monad
 
+
+```hs
+-- file: ch14/Logger.hs
+globToRegex cs =
+    globToRegex' cs >>= \ds ->
+    return ('^':ds)
+```
 
 ### Mixing Pure and Monadic Code 
 Not yet
