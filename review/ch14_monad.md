@@ -83,9 +83,11 @@ skipSpace :: (a, L.ByteString) -> Maybe (a, L.ByteString)
 skipSpace (a, s) = Just (a, L8.dropWhile isSpace s)
 ```
 
-또 다시 발견되는 공통되는 패턴 : 스트림에서 일부 string을 소비하고, 결과와 남은 스트림을 반환한다.
-만약 여기서 우리가 남은 stream 외에 한 가지를 더 다음 chain으로 넘기기를 원한다면? : 모든 스텝의 코드가 수정되어야 할 것이다.
-상태를 다음 chain으로 넘기는 코드를 개개 스텝의 함수에서 chain함수로 넘기는 것이 좋겠다.
+* 또 다시 발견되는 공통되는 패턴
+	* 스트림에서 일부 string을 소비하고, 결과와 남은 스트림을 반환한다.  
+* 만약 여기서 우리가 남은 stream 외에 한 가지를 더 다음 chain으로 넘기기를 원한다면?
+	* 모든 스텝의 코드가 수정되어야 할 것이다. 
+* 상태를 다음 chain으로 넘기는 코드를 개개 스텝의 함수에서 chain함수로 넘기는 것이 좋겠다.
 
 상태를 넘기는 코드를 chain함수로 넘긴 것.
 
@@ -102,12 +104,12 @@ firstParser ==> secondParser  =  Parse chainedParser
                 runParse (secondParser firstResult) newState
 ```
 
-parsing state의 상세도 숨겼고, getState, putState 함수들도 parsing state의 상세함을 몰라도 이용할 수 있으므로,
-(어떻게 숨겼는지 앞 챕터를 봐야함. 여기서는 패턴매칭등이 사용되지 않고, 실제 Data Constructor를 몰라도 이용할 수 있다 정도로 이해하면 됨)
-ParseSate가 변경되더라도 코드가 많이 변경될 필요는 없다.
+parsing state의 상세도 숨겼고, getState, putState 함수들도 parsing state의 상세함을 몰라도 이용할 수 있으므로,  
+(어떻게 숨겼는지 앞 챕터를 봐야함. 여기서는 패턴매칭등이 사용되지 않고, 실제 Data Constructor를 몰라도 이용할 수 있다 정도로 이해하면 됨)  
+이제 ParseSate가 변경되더라도 코드가 많이 변경될 필요는 없다.
 
 ### Looking for Shared Patterns
-위에서 본 것이 그다지 일반적으로 보이지 않을 수 있다.
+위에서 본 것이 그다지 일반적으로 보이지 않을 수 있다.  
 우리 코드를 간략하게 만들 수 있도록, 두 가지(Maybe, Parse) 코드 모두 함수를 chaining 하고 그 상세를 감춰주는데 신경을 쓰고있다.  
 
 다시 그 정의부터 다시 봐 보자.
@@ -141,7 +143,7 @@ ghci> :type (==>)
 chain :: m a -> (a -> m b) -> m b
 ```
 
-끝으로, 각각의 케이스에 "plain" value를 받아서 그것을 타겟타입에 "injects" 하는 함수가 필요하다.
+끝으로, 각각의 케이스에 "plain" value를 받아서 그것을 타겟타입에 "injects" 하는 함수가 필요하다.  
 Maybe의 경우로 보자면, 단순히 Just일 것이다. 아래는 Parse의 경우 예이다.
 ```hs
 -- file: ch10/Parse.hs
@@ -239,31 +241,37 @@ module Logger
 	* value constructor를 노출하지 않는 대신 Logger에 있는 결과와 그 결과가 나오기 까지 남은 log를 가져올 수 있는 함수를 제공한다.
 
 ##### Controlled Escape
-monad typeclass는 monad 를 벗고(unwrap) plain value를 얻을 수 있는 어떤 방법을 제공하지 않는다.
-bind, return 모두 그에 해당하지 않는다. bind는 unwrap하지만, 다시 감싸서 반환해야 한다.
-대부분의 monads는 하나 이상의 runLogger와 같은 함수들을 제공한다. IO는 예외기는 하다. 이는 프로그램 종료시점에 된다.
+monad typeclass는 monad 를 벗고(unwrap) plain value를 얻을 수 있는 어떤 방법을 제공하지 않는다.  
+bind, return 모두 그에 해당하지 않는다. bind는 unwrap하지만, 다시 감싸서 반환해야 한다.  
+대부분의 monads는 하나 이상의 runLogger와 같은 함수들을 제공한다.  
+IO는 예외이다. 이는 프로그램 종료시점에 된다.
 
 
 ##### Leaving a Trace
 
-record : logger action안에서 실행됨, 이러한 특별한 접근을 위한 untility들이 필요함.
+* record
+	* logger action안에서 실행된다.
+	* 이러한 특별한 접근을 위한 untility들이 필요하다.
+
 
 ```hs
 -- file: ch14/Logger.hs
 record :: String -> Logger ()
-```
+``` 
+
 ```hs
 ghci> let simple = return True :: Logger Bool
 ghci> runLogger simple
 (True,[])
 ```
+
 ```hs
 ghci> runLogger (record "hi mom!" >> return 3.1337)
 (3.1337,["hi mom!"])
 ```
 
-##### Using the Logger Monad
 
+##### Using the Logger Monad
 
 ```hs
 -- file: ch14/Logger.hs
@@ -273,4 +281,367 @@ globToRegex cs =
 ```
 
 ### Mixing Pure and Monadic Code 
-Not yet
+모나드에 상당한 단점이 있는것으로 볼 수 있다. Monad value는 일반함수와 섞어서 쓰는 것이 어렵다.     
+예를 들어 로거 모나드에서 로깅한 string의 length를 바로 pure 한 length함수를 이용해서 알기는 어렵다.
+
+```hs
+ghci> let m = return "foo" :: Logger String
+ghci> length m
+
+<interactive>:1:7:
+    Couldn't match expected type `[a]'
+           against inferred type `Logger String'
+    In the first argument of `length', namely `m'
+    In the expression: length m
+    In the definition of `it': it = length m
+```
+아래와 같이 해야 한다.
+```hs
+ghci> :type   m >>= \s -> return (length s)
+m >>= \s -> return (length s) :: Logger Int
+```
+
+* lifting
+	* "Introducing Functors" 에서 소개했었다.
+	* function을 functor로 lifting 하는 것이다.
+	* unwrap => function 호출 => 동일한 constructor로 rewrap 과정이라고 보면 된다.
+	* Monad와 동일하다.
+		* 모나드의 (>>=) : unwrap pure function 호출
+		* return : rewrap
+		* liftM은 Monad의 구체적인 구현을 알 필요 없이 (>>=)와 return을 이용하면 된다.
+
+liftM 정의  
+```hs
+-- file: ch14/Logger.hs
+liftM :: (Monad m) => (a -> b) -> m a -> m b
+liftM f m = m >>= \i ->
+            return (f i)
+```
+
+Functor의 instance인 타입을 정의하려면 fmap을 우리가 만들려는 타입에 맞게 정의해 주어야 하는 반면, liftM은 그럴 필요가 없다.    
+(>>=)와 return에 추상화되어있으므로, 타입 정의할 때 한 번 정의하면 된다.    
+
+liftM은 Control.Monad 모듈에 이미 정의되어있다.  
+liftM 사용하지 않는 코드
+```hs
+-- file: ch14/Logger.hs
+charClass_wordy (']':cs) =
+    globToRegex' cs >>= \ds ->
+    return (']':ds)
+charClass_wordy (c:cs) =
+    charClass_wordy cs >>= \ds ->
+    return (c:ds)
+```
+liftM 사용 코드 (>>=과 보기 싫은 lambda 함수를 제거할 수 있었다.)
+```hs
+-- file: ch14/Logger.hs
+charClass (']':cs) = (']':) `liftM` globToRegex' cs
+charClass (c:cs) = (c:) `liftM` charClass cs
+```
+fmap 처럼 liftM도 infix 형태로 자주 사용한다.  
+의미는 왼쪽에 있는 pure 함수에 우측의 monadic action의 결과를 적용해라 이다.  
+
+liftM이 굉장히 유용해서 여러 파라미터를 받는 버전이 Control.Monad에 정의되어 있다.
+liftM2 사용와 liftM2 정의
+```hs
+-- file: ch14/Logger.hs
+globToRegex' (c:cs) = liftM2 (++) (escape c) (globToRegex' cs)
+
+escape :: Char -> Logger String
+escape c
+    | c `elem` regexChars = record "escape" >> return ['\\',c]
+    | otherwise           = return [c]
+  where regexChars = "\\+()^$.{}]|"
+
+-- file: ch14/Logger.hs
+liftM2 :: (Monad m) => (a -> b -> c) -> m a -> m b -> m c
+liftM2 f m1 m2 =
+    m1 >>= \a ->
+    m2 >>= \b ->
+    return (f a b)
+```
+liftM5까지 정의되어있다.
+
+### Putting a Few Misconceptions to Rest
+자주 반복되는 monad에 대한 미신들
+* Monad는 이해하기 어렵다.
+	* 우리가 앞에서 몇몇 모나드를 보았는데, Monad는 몇몇 문제를 해결하기 위해 자연적으로 나오는 것이었다.  
+	* Monad를 이해하는 가장 빠른 방법은 특정한 문제들을 살펴보고 그들을 해결하는데 공통점이 있는지 보는 것이다.
+* Monad는 I/O와 imperative coding 에만 유용하다.
+	* haskell I/O 이외의 영역에서 Monad가 쓰이는 것을 보았다. 
+	* 함수 chaining을 짧게 하기 위해, 복잡한 state를 감추기 위해, logging을 위해 등등..
+* Monad는 Haskell에만 있다.
+	* Haskell이 monads를 가장 명시적으로 사용하는 언어이겠지만, 다른 언어에서도 사용하고 있다.  
+	* 물론 Haskell에서 Monad를 가장 다루기 쉽다. do notation 때문에, 타입추론, language's syntax 등등..
+* Monad는 evaluation 순서를 조절하기 위한 것이다. 
+
+
+### Building the Logger Monad
+단순한 로거 Monad를 만들어 보자.  
+
+```hs
+-- file: ch14/Logger.hs
+newtype Logger a = Logger { execLogger :: (a, Log) }
+```
+단순한 pair이다. 여기서 a는 action의 result이고, Log는 a라는 action이 싱행되는 동안 발생한 로그 메시지의 리스트이다.  
+다른 타입으로 만들기 위해 newtype으로 정의했다.  
+runLogger는 그 tuple값을 Logger Monad로부터 꺼내는 작업을 한다.  
+runLogger가 외부에 노출된 interface인데, 여기서는 execLogger의 다른 이름일 뿐이다.
+
+record : 로그 메시지만 있다.
+
+(>>=) : 이게 Monad의 핵심인데, action과 monadic function을 엮어서 새로운 결과와 결합된 새 로그를 만들어 준다.  
+
+```hs
+-- file: ch14/Logger.hs
+runLogger = execLogger
+
+record s = Logger ((), [s])
+
+-- file: ch14/Logger.hs
+instance Monad Logger where
+    return a = Logger (a, [])
+
+    -- (>>=) :: Logger a -> (a -> Logger b) -> Logger b
+    m >>= k = let (a, w) = execLogger m
+                  n      = k a
+                  (b, x) = execLogger n
+              in Logger (b, w ++ x)
+
+```
+
+##### Sequential Logging, Not Sequential Evaluation
+위의 (>>=) 구현은 Logger b의 로그 메시지에, Logger a의 log가 먼저 오고, k a 실행 시 발생한 로그가 온다는 것은 보장하지만,  
+a와 b가 어떤 순서로 실행되는지는 보장하지 않는다. (>>=) 는 lazy이다.
+
+strictness라는 측면에서 monad의 동작은, monad의 다른 면들과 마찬가지로 각 monad의  구현이 어떻게 되어있느냐에 달려있는 것이지  
+모든 monad들이 고정된 속성을 가지고 있는 것은 없다.    
+
+##### The Writer Monad
+우리가 위에서 작성한 Logger는 standard Writer monad(Control.Monad.Writer 모듈의)의 특별한 버전이다.  
+"Using Typeclasses"에서 볼 예정이다. 
+
+
+### The Maybe Monad
+Maybe monad는 아마도 거의 가장 단순한 monad일 것 같다. procedure의 결과가 없을 수도 있는 것을 표현한다.
+
+```hs
+-- file: ch14/Maybe.hs
+instance Monad Maybe where
+    Just x >>= k  =  k x
+    Nothing >>= _ =  Nothing
+
+    Just _ >> k   =  k
+    Nothing >> _  =  Nothing
+
+    return x      =  Just x
+
+    fail _        =  Nothing
+```
+(>>=) (>>)를 이용해서 여러개의 computation을 chaining할 때 그들 중 하나가 Nothing을 return할 수 있다. 그러면 그 이후는 모두 evaluate되지 않는다.  
+그렇긴 하지만, 완전히 chaining이 완전히 줄어든 것은 아니다.  
+Nothing이 다음 함수로 넘어가고, 또 그 다음 함수로 끝까지 함수 호출이 이어진다.  
+Nothing value를 matching하는 것이 runtime에 싸기는 하지만, 공짜는 아니다.  
+
+
+##### Executing the Maybe Monad
+Maybe monad를 실행하기에 가장 알맞은 함수는 maybe  
+첫번 째 오는 b는 3번째 파라미터로 Nothing이 오는 경우 return할 값  
+3번째 파라미터가 Just인 경우 첫 파라미터 b는 무시되고 f x 가 수행된 결과를 return 함  
+```hs
+-- file: ch14/Maybe.hs
+maybe :: b -> (a -> b) -> Maybe a -> b
+maybe n _ Nothing  = n
+maybe _ f (Just x) = f x
+``` 
+Maybe는 너무 단순해서, maybe 만큼이나 패턴매칭도 많이 사용된다.  
+각각 더 readable한 때가 있으므로, 알아서 써라.   
+
+
+##### Maybe at Work, and Good API Design
+고객의 이름으로 빌링 주소 찾기
+
+먼저, 타입 정의
+```hs
+-- file: ch14/Carrier.hs
+import qualified Data.Map as M
+
+type PersonName = String
+type PhoneNumber = String
+type BillingAddress = String
+data MobileCarrier = Honest_Bobs_Phone_Network
+                   | Morrisas_Marvelous_Mobiles
+                   | Petes_Plutocratic_Phones
+                     deriving (Eq, Ord)
+
+findCarrierBillingAddress :: PersonName
+                          -> M.Map PersonName PhoneNumber
+                          -> M.Map PhoneNumber MobileCarrier
+                          -> M.Map MobileCarrier BillingAddress
+                          -> Maybe BillingAddress
+```
+
+case가 많이 사용되고, 오른쪽으로 쭉쭉 늘어나는 boilerplate가 많은 코드
+```hs
+-- file: ch14/Carrier.hs
+variation1 person phoneMap carrierMap addressMap =
+    case M.lookup person phoneMap of
+      Nothing -> Nothing
+      Just number ->
+          case M.lookup number carrierMap of
+            Nothing -> Nothing
+            Just carrier -> M.lookup carrier addressMap
+```
+
+ 
+```hs
+ghci> :module +Data.Map
+ghci> :type Data.Map.lookup
+Data.Map.lookup :: (Ord k, Monad m) => k -> Map k a -> m a
+```
+위 정의에서는 map에 데이터가 있었던 경우, Monad 타입에 결과를 넣어주고, 없으면 error를 내는 방식
+* 우리가 lookup호출할 때 넘겨준 monad를 기반으로 success, failure를 자동으로 customise할 수 있다.
+	* variation1에서는 결과를 Maybe와 비교하고 있다.
+* hitch는 잘못된 monad에서 fail을 사용해서 성가신 예외를 던지는 것입니다.  
+  이전에 fail 시키는 것에 대해 경고했었으므로, 다시 언급하지 않겠다.
+
+실제로는 모든 lookup의 결과는 Maybe이다.
+
+
+Maybe가 Monad라는 것을 이용해 더 간단하게 만든 코
+```hs
+-- file: ch14/Carrier.hs
+variation2 person phoneMap carrierMap addressMap = do
+  number <- M.lookup person phoneMap
+  carrier <- M.lookup number carrierMap
+  address <- M.lookup carrier addressMap
+  return address
+```
+
+위 코드가 imperitive programmer에게 더 익숙하겠지만, 맨 아래 return address는 redundant 제거하자.  
+아래 코드가 더 일반적이다.
+```hs
+-- file: ch14/Carrier.hs
+variation2a person phoneMap carrierMap addressMap = do
+  number <- M.lookup person phoneMap
+  carrier <- M.lookup number carrierMap
+  M.lookup carrier addressMap
+```
+
+partial application을 이용해서 더 간단하게 작성한 모습  
+파라미터 순서를 flip을 이용해서 바꿔서 한 줄로 작성할 수 있었다.
+```hs
+-- file: ch14/Carrier.hs
+variation3 person phoneMap carrierMap addressMap =
+    lookup phoneMap person >>= lookup carrierMap >>= lookup addressMap
+  where lookup = flip M.lookup
+```
+
+### The List Monad
+Maybe가 1개 혹은 없음을 나타내는 반면, List는 더 다양한 것을 표한하기에 적합하다.  
+물론 List를 Monad로 사용할 수 있다.  
+Prelude에 List Monad가 정의되어있지만, 어떻게 생겼을지 생각해 보자.  
+
+쉬운 return 부터 생각 해 보자.  m a이므로, [] a 라고 할 수 있겠다. 더 익숙한 표현으로 바꾸면 [a]이다. 
+```hs
+-- file: ch14/ListMonad.hs
+returnSingleton :: a -> [a]
+returnSingleton x = [x]
+```
+(>>=) 는 자연스럽게 아래와 같다. map과 굉장히 비슷하다.
+```hs
+ghci> :type (>>=)
+(>>=) :: (Monad m) => m a -> (a -> m b) -> m b
+
+ghci> :type map
+map :: (a -> b) -> [a] -> [b]
+```
+map과 비슷하지만, 파라미터 순서가 맞지 않는데, flip을 이용하면 된다.
+```hs
+ghci> :type (>>=)
+(>>=) :: (Monad m) => m a -> (a -> m b) -> m b
+ghci> :type flip map
+flip map :: [a] -> (a -> b) -> [b]
+```
+아직 맞지 않는 부분이 있는데, (a -> m b) 와 (a -> b) 이다. concat을 이용해서 맞추자.
+```hs
+ghci> :type \xs f -> concat (map f xs)
+\xs f -> concat (map f xs) :: [a] -> (a -> [a1]) -> [a1]
+```
+
+List Monad 정의  
+(>>), fail 은 자명하다.
+```hs
+-- file: ch14/ListMonad.hs
+instance Monad [] where
+    return x = [x]
+    xs >>= f = concat (map f xs)
+    xs >> f = concat (map (\_ -> f) xs)
+    fail _ = []
+```
+ 
+##### Understanding the List Monad
+List Monad는 친숙한 Haskell tool인 list comprehension과 유사하다.  
+2개의 list를 Cartesian 곱을 계산하는 것을 보자.  
+아래 두 코드는 굉장히 유사하고, 결과도 같다.
+
+```hs
+-- file: ch14/CartesianProduct.hs
+comprehensive xs ys = [(x,y) | x <- xs, y <- ys]
+-- file: ch14/CartesianProduct.hs
+monadic xs ys = do { x <- xs; y <- ys; return (x,y) }
+```
+중괄호를 없애고 다시 보자.  
+xs의 각 x에 대해 나머지 함수가 모두 실행되고, ys의 각 y에 대해 함수의 나머지 부분이 실행되는 더블중첩 함수이다.  
+***중요한 것은, 어떤 모나드 안에서 실행되었는지 모르면, monadic code block이 어떻게 동작할지 예측할 수 없음.***
+```hs
+-- file: ch14/CartesianProduct.hs
+blockyDo xs ys = do
+    x <- xs
+    y <- ys
+    return (x, y)
+```
+
+do 도 없애고 좀 더 명확하게 봐보자.
+```hs
+-- file: ch14/CartesianProduct.hs
+blockyPlain xs ys =
+    xs >>=
+    \x -> ys >>=
+    \y -> return (x, y)
+
+blockyPlain_reloaded xs ys =
+    concat (map (\x ->
+                 concat (map (\y ->
+                              return (x, y))
+                         ys))
+            xs)
+```
+
+##### Putting the List Monad to Work
+brute-force 로 두 수의 곱이 어떤 integer n이 되는 모든 positive integer pair를 구하는 함수.
+```hs
+-- file: ch14/MultiplyTo.hs
+guarded :: Bool -> [a] -> [a]
+guarded True  xs = xs
+guarded False _  = []
+
+multiplyTo :: Int -> [(Int, Int)]
+multiplyTo n = do
+  x <- [1..n]
+  y <- [x..n]
+  guarded (x * y == n) $
+    return (x, y)
+```
+
+
+### Desugaring of do Blocks
+
+##### Monads as a Programmable Semicolon
+
+##### Why Go Sugar-Free?
+
+
+
+### The State Monad
+Not Yet
