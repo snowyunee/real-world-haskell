@@ -797,6 +797,7 @@ state s, result a 라 하면, s -> (a, s) 일 것이다.
 거의 State monad와 비슷한 코드를 만들어보자.  
 
 *  type
+
 ```hs
 type SimpleState s a = s -> (a, s)
 ```
@@ -809,6 +810,7 @@ type StringState a SimpleState String a
 ```
 
 * return을 정의해보자.
+
 ```hs
 returnSt :: a -> SimpleState s a
 returnSt a = (\s -> (a, s)
@@ -819,13 +821,15 @@ returnAlt :: a -> SimpleState s a
 returnAlt a s = (a, s)
 ```
 * (>>=)
+
 ```hs
 bindSt :: (SimpleState s a) -> (a -> SimpleState s b) -> SimpleState s b
 bindSt m k = \s -> let (a, s') = m s
                    in (k a) s'
 ```
-	* 의미 있는 변수이름을 사용하여, readability를 높인 코드
-	
+
+의미 있는 변수이름을 사용하여, readability를 높인 코드
+
 ```hs
 -- file: ch14/SimpleState.hs
 -- m == step
@@ -837,7 +841,7 @@ bindAlt step makeStep oldState =
     in  (makeStep result) newState
 ```
 
-	* 타입을 풀어서 실제 타입을 알기 쉽게 보여주는 버전
+타입을 풀어서 실제 타입을 알기 쉽게 보여주는 버전
 
 ```hs
 bindAlt :: (s -> (a, s))        -- step
@@ -846,12 +850,100 @@ bindAlt :: (s -> (a, s))        -- step
 ```
 
 ##### Reading and Modifying the State
+State monad의 (>>=), return은 state를 전달하기만 하므로, state를 읽고/변경할 수 있는 함수가 필요하다.
+
+```hs
+getSt :: SimpleState s s
+getSt = \s -> (s, s)
+
+putSt :: s -> SimpleState s ()
+putSt s = \_ -> ((), s)
+``` 
 
 ##### Will the Real State Monad Please Stand Up?
+실제 State monad
+
+* type
+
+constructor에서 s -> (a, s) 를 wrap한 것 밖에 없다.
+
+```hs
+newtype State s a = State {
+      runState :: s -> (a, s)
+    }
+```
+
+* return
+
+```hs
+returnState :: a -> State s a
+returnState a = State $ \s -> (a, s)
+```
+
+* (>>=) / bind
+
+```hs
+bindState :: State s a -> (a -> State s b) -> State s b
+bindState m k = State $ \s -> let (a, s') = runState m s
+                              in runState (k a) s'
+```
+* get/set
+
+```hs
+get :: State s s
+get = State $ \s -> (s, s)
+
+put :: s -> State s ()
+put s = State $ \_ -> ((), s)
+```
+
 
 ##### Using the State Monad: Generating Random Values
+Parse에서는 state type이 ByteString으로 고정되어있었으나,  
+standard library의 State monad는 어떤 타입의 state라도 올 수 있다.  
+예를 들어 : State ByteString
+
+pseudorandom value generation 을 구현해보자.
+
+Haskell standard random value generation module : System.Random
+
+IO monad 안에서 돌아가는 버전, C함수의 rand와 유사한 버전.  
+randomR은 inclusive range를 받음.
+```hs
+rand :: IO Int
+rand = getStdRandom (randomR (0, maxBound))
+```
+
+System.Random에서 제공하는 type classes
+1. RandomGen : 새로운 Random int value에 대한 소스를 정의할 수 있게 해준다.  <br> true random source가 있는 경우, 이 type class 를 이용해서 정의하면 됨. 
+2. StenGen : standard RandomGen instance, pseudorandom
+3. Random : 특정 타입의 random value를 어떻게 정의할 지 <br> 일반적인 단순한 타입들에 대해서는 이미 다 정의되어 있다.
+
+위의 rand코드는 built-in global random generator (IO monad를 상속받고 있다.)를 이용하고 있다. 
 
 ##### A First Attempt at Purity
+pure하게 random을 사용해 보자.
+
+purity의 어려운점은 random number generator를 get/create 하고 그것이 필요한 곳 까지 전달해야 한다는 것이다.  
+거기서 random을 호출하고 나면, 새 random number generator가 return 된다.
+
+동일한 random generator 를 사용하면 동일한 random value가 나온다.
+```hs
+twoBadRandoms :: RandomGen g => g -> (Int, Int)
+twoBadRandoms gen = (fst $ random gen, fst $ random gen)
+``` 
+
+정상적으로 돌아가는 버전은 좀 그렇다.
+```hs
+twoGoodRandoms :: RandomGen g => g -> ((Int, Int), g)
+twoGoodRandoms gen = let (a, gen') = random gen
+                         (b, gen'') = random gen'
+                     in ((a, b), gen'')
+```
+
+이제 state monad를 도입할 때이다.  
+IO monad의 global state를 조작하지 않는 다는 것을 보장하는 pure 코드에서 이제 random을 사용해 보자.  
+code의 동작을 추론하는데 purity는 매우 중요하다.
 
 ##### Random Values in the State Monad
 
