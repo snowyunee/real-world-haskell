@@ -636,12 +636,239 @@ multiplyTo n = do
 
 
 ### Desugaring of do Blocks
+하스켈의 do syntax는 syntactic sugar의 예이다. (>>=) 와 anonymous 함수 없이 monadic code를 작성하는 방법을 제공한다.  
+Desugaring은 syntactic sugar를 해석해서 core language로 돌려놓는 과정이다.  
+
+do의 desugaring 과정  
+컴파일러가 아래 과정을 do keyward가 없어질 때까지 반복하는 것이라고 보면 된다.
+  
+* do keyword다음에 1개 action이 있는 경우
+
+```hs
+-- file: ch14/Do.hs
+doNotation1 =
+    do act
+----------------------------
+-- file: ch14/Do.hs
+translated1 =
+    act
+```
+
+* do keyword 다음에 1개 이상의 action 이 있는 경우
+
+```hs
+-- file: ch14/Do.hs
+doNotation2 =
+    do act1
+       act2
+       {- ... etc. -}
+       actN
+----------------------------
+-- file: ch14/Do.hs
+translated2 =
+    act1 >>
+    do act2
+       {- ... etc. -}
+       actN
+
+finalTranslation2 =
+    act1 >>
+    act2 >>
+    {- ... etc. -}
+    actN
+```
+
+* <- notation : 주의해서 볼만한 가치가 있음.  
+
+```hs
+-- file: ch14/Do.hs
+doNotation3 =
+    do pattern <- act1
+       act2
+       {- ... etc. -}
+       actN
+-----------------------------------------
+-- file: ch14/Do.hs
+translated3 =
+    let f pattern = do act2
+                       {- ... etc. -}
+                       actN
+        f _     = fail "..."
+    in act1 >>= f
+```
+
+```hs
+-- file: ch14/Do.hs
+robust :: [a] -> Maybe a
+robust xs = do (_:x:_) <- Just xs
+               return x
+-----------------------------------------
+robust xs = let f (_:x:_) = do return x
+                f _       = fail "..."  // => 여기서 Maybe Monad의 fail 함수 호출. : Nothing
+            in Just xs >>= f
+
+ghci> robust [1,2,3]
+Just 2
+ghci> robust [1]
+Nothing
+```
+
+* do 안에서 let 키워드 사용 시, in 키워드 생략 가능, 하지만, in 키워드 이후에 왔을 내용들이 let키워드와 줄맞춤 되어야 한다.
+
+```hs
+-- file: ch14/Do.hs
+doNotation4 =
+    do let val1 = expr1
+           val2 = expr2
+           {- ... etc. -}
+           valN = exprN
+       act1
+       act2
+       {- ... etc. -}
+       actN
+-----------------------------------------
+-- file: ch14/Do.hs
+translated4 =
+    let val1 = expr1
+        val2 = expr2
+        valN = exprN
+    in do act1
+          act2
+          {- ... etc. -}
+          actN
+```
 
 ##### Monads as a Programmable Semicolon
 
+do, {}, ; 로 이루어진 syntex를 이용하여, align 대신 express를 구분하게 할 수 있다.  
+모나드는 일종의 "programmable semicolon" 이라는 apt(automatically programmed tool ??)슬로건을 만들었다. (>>), (>>=) 가 ;과 대치되므로.  
+ 
+```hs
+-- file: ch14/Do.hs
+semicolon = do
+  {
+    act1;
+    val1 <- act2;
+    let { val2 = expr1 };
+    actN;
+  }
+-----------------------------------------
+-- file: ch14/Do.hs
+semicolonTranslated =
+    act1 >>
+    let f val1 = let val2 = expr1
+                 in actN
+        f _ = fail "..."
+    in act2 >>= f
+```
+
 ##### Why Go Sugar-Free?
 
+초보일 때는 더더군다나 syntatic sugar를 사용하지 않는 것이 반복적으로 연습함으로써 어떤 코드를 작성하고 있는지 알기에 좋다.  
+
+(=<<) 는 do를 쓰던 안쓰던 종종 나타난다. (>>=)의 flipped버전이다. 
+```hs
+ghci> :type (>>=)
+(>>=) :: (Monad m) => m a -> (a -> m b) -> m b
+ghci> :type (=<<)
+(=<<) :: (Monad m) => (a -> m b) -> m a -> m b
+```
+
+monadic 함수를 right-to-left 스타일로 compose하기에 편리하다.
+```hs
+-- file: ch14/CartesianProduct.hs
+wordCount = print . length . words =<< getContents
+```
 
 
 ### The State Monad
-Not Yet
+앞에서 본 Parse가 monad 였음을 보았는데, 이는 2가지 구분되는 기능을 수행하고 있었다.  
+* 파싱에 실패했을 때 구체적인 에러메시지 (Either로 구현했다.)
+* implicit state (파싱되고 남은 ByteString)
+
+state를 읽고 쓸수 있는 방법에 대한 요구는 하스켈 프로그램에서 충분히 일반적인 일이고,  
+Control.Monad.State라는 모듈에 State monad가 구현되어 있다.  
+
+state를 가지고 우리가 하려는 것은 명확하다.  
+어떤 state가 주어지면, 그 state값을 보고 새로운 결과와 새로운 state를 리턴하는 것이다.  
+state s, result a 라 하면, s -> (a, s) 일 것이다. 
+
+##### Almost a State Monad
+거의 State monad와 비슷한 코드를 만들어보자.  
+
+*  type
+```hs
+type SimpleState s a = s -> (a, s)
+```
+state는 상태를 받아서 어떤 결과값과 함께 다른 상태를 내는 함수이다.  
+이 때문에 State monad는 state transformer monad라고도 불린다.
+monad는 type 파라미터를을 1개만 받는 type constructor를 가져야 하므로,  
+아래와 같이 State를 String type으로 partial apply 한다. 
+```hs
+type StringState a SimpleState String a
+```
+
+* return을 정의해보자.
+```hs
+returnSt :: a -> SimpleState s a
+returnSt a = (\s -> (a, s)
+```
+curring을 이용하여 작성한 함수, 위 함수와 동일하다.
+```hs
+returnAlt :: a -> SimpleState s a
+returnAlt a s = (a, s)
+```
+* (>>=)
+```hs
+bindSt :: (SimpleState s a) -> (a -> SimpleState s b) -> SimpleState s b
+bindSt m k = \s -> let (a, s') = m s
+                   in (k a) s'
+```
+	* 의미 있는 변수이름을 사용하여, readability를 높인 코드
+	
+```hs
+-- file: ch14/SimpleState.hs
+-- m == step
+-- k == makeStep
+-- s == oldState
+
+bindAlt step makeStep oldState =
+    let (result, newState) = step oldState
+    in  (makeStep result) newState
+```
+
+	* 타입을 풀어서 실제 타입을 알기 쉽게 보여주는 버전
+
+```hs
+bindAlt :: (s -> (a, s))        -- step
+        -> (a -> s -> (b, s))   -- makeStep
+        -> (s -> (b, s))        -- (makeStep result) newState
+```
+
+##### Reading and Modifying the State
+
+##### Will the Real State Monad Please Stand Up?
+
+##### Using the State Monad: Generating Random Values
+
+##### A First Attempt at Purity
+
+##### Random Values in the State Monad
+
+##### Running the State Monad
+
+##### What About a Bit More State?
+
+
+
+
+### Monads and Functors
+
+
+##### Another Way of Looking at Monads
+
+### The Monad Laws and Good Coding Style
+
+
+
+
