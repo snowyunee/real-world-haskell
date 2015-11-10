@@ -369,7 +369,8 @@ liftM5까지 정의되어있다.
 	* Monad를 이해하는 가장 빠른 방법은 특정한 문제들을 살펴보고 그들을 해결하는데 공통점이 있는지 보는 것이다.
 * Monad는 I/O와 imperative coding 에만 유용하다.
 	* haskell I/O 이외의 영역에서 Monad가 쓰이는 것을 보았다. 
-	* 함수 chaining을 짧게 하기 위해, 복잡한 state를 감추기 위해, logging을 위해 등등..
+	* 함수 chaining을 짧게 하기 위해, 복잡한 
+	* 를 감추기 위해, logging을 위해 등등..
 * Monad는 Haskell에만 있다.
 	* Haskell이 monads를 가장 명시적으로 사용하는 언어이겠지만, 다른 언어에서도 사용하고 있다.  
 	* 물론 Haskell에서 Monad를 가장 다루기 쉽다. do notation 때문에, 타입추론, language's syntax 등등..
@@ -914,10 +915,13 @@ rand :: IO Int
 rand = getStdRandom (randomR (0, maxBound))
 ```
 
-System.Random에서 제공하는 type classes
-1. RandomGen : 새로운 Random int value에 대한 소스를 정의할 수 있게 해준다.  <br> true random source가 있는 경우, 이 type class 를 이용해서 정의하면 됨. 
-2. StenGen : standard RandomGen instance, pseudorandom
-3. Random : 특정 타입의 random value를 어떻게 정의할 지 <br> 일반적인 단순한 타입들에 대해서는 이미 다 정의되어 있다.
+System.Random에서 제공하는 class 와 Types
+* RandomGen (type class)
+	* 새로운 Random int value에 대한 소스를 정의할 수 있게 해준다.  <br> true random source가 있는 경우, 이 type class 를 이용해서 정의하면 됨. 
+* StdGen (type)
+	* standard RandomGen instance, pseudorandom
+* Random (type class)
+	* 특정 타입의 random value를 어떻게 정의할 지, 일반적인 단순한 타입들에 대해서는 미리 정의되어 있다.
 
 위의 rand코드는 built-in global random generator (IO monad를 상속받고 있다.)를 이용하고 있다. 
 
@@ -946,21 +950,233 @@ IO monad의 global state를 조작하지 않는 다는 것을 보장하는 pure 
 code의 동작을 추론하는데 purity는 매우 중요하다.
 
 ##### Random Values in the State Monad
+State monad 예. (state의 일부가 StdGen임)
+```hs
+type RandomState a = State StdGen a
+```
+* type synonym
+	* 타이핑 수도 줄여주고, random generator를 StdGen이 아닌 다른 것으로 교체되는 등의 state변화 시 수정 코드가 줄어듦
+* random value 생성
+	* 이제 현재 generator를 전달하고, 사용하고, 새 generator를 업데이트 하는 문제로 변경 됨
+	
+```hs
+getRandom :: Random a => RandomState a
+getRandom = 
+  get >>= \gen ->
+  let (val, gen') = random gen in
+  put gen' >>
+  return val
+```
+* 간단해진 새로운 랜덤값 pair 함수
+
+```hs
+getTwoRandoms :: Random a => RandomState (a, a)
+getTwoRandoms = liftM2 (,) getRandom getRandom
+``` 
+
 
 ##### Running the State Monad
+* 각 모나드는 그 자신만의 특별한 evaluation 함수가 있다.
+* State monad 구현의 선택지  
+  evalState, execState는 모두 runState를 이용해서 구현 가능
+	* runState
+		* (결과값, 최종 상태) 반환
+	* evalState
+		* (결과값) 반환, (최종 상태)는 버림
+	* execState
+		* (최종 상태) 반환, (결과값)은 버림
+* 최종구현
+
+```hs
+runTwoRandoms :: IO (Int, Int)
+runTwoRandoms = do
+  oldState <- getStdGen
+  let (result, newState) = runState getTwoRandoms oldState
+  setStdGen newState
+  return result
+```
+
 
 ##### What About a Bit More State?
+* 여러 값으로 이루어진 state
+	* state있는 값 2가지 모두 사용하고, 새 state로 수정하는 예
 
+```hs
+data CountedRandom = CountedRandom {
+      crGen :: StdGen
+    , crCount :: Int
+    }
 
+type CRState = State CountedRandom
 
+getCountedRandom :: Random a => CRState a
+getCountedRandom = do
+  st <- get
+  let (val, gen') = random (crGen st)
+  put CountedRandom { crGen = gen', crCount = crCount st + 1 }
+  return val
+```
+* CRState와 CoutedRandom 정의에 a 가 생략되어있는 것 같다.
+
+```hs
+data CountedRandom a = CountedRandom {
+      crGen :: StdGen a
+    , crCount :: Int
+    }
+
+type CRState a = State CountedRandom a
+```
+* getCount
+	* 상태의 일부만 읽기
+
+```
+getCount :: CRState Int
+getCount = crCount `liftM` get
+```
+* putCount
+	* 상태의 일부만 수정
+
+```hs
+putCount :: Int -> CRState ()
+putCount a = do
+  st <- get
+  put st { crCount = a }
+```
+
+* record update syntax
+	* st의 그대로 카피하고(crCount filed 제외), crCount 는 a를 사용함.
+	* 하스켈에서 자랑할만한 것으로 취급되진 않지만, 동작하긴 한다. 
+
+```hs
+ st { crCount = a }
+```
+
+* modify
+
+```hs
+putCountModify :: Int -> CRState ()
+putCountModify a = modify $ \st -> st { crCount = a }
+```
 
 ### Monads and Functors
+* Functors와 monads는 관계가 깊다. 둘 다 수학의 category theory에서 빌려온 용어이다.  
+  하지만, 하스켈과의 완벽히 매핑되지는 않는다.
+* category theory에서 monad는 functor로 구현된다. 하지만, 하스켈에서 Monad typeclass가 Functor의 subclass는 아니다.
+* 하스켈 라이브러리 저자는 차선책으로, Monad typeclass의 instance마다 Functor의 instance를 작성해 두었다.
+* 그리고, 아래와 같이 liftM과 fmap은 같다. (pure 함수를 monad로 lift 시칸다)
 
+```hs
+ghci> :type fmap
+fmap :: (Functor f) => (a -> b) -> f a -> f b
+ghci> :module +Control.Monad
+ghci> :type liftM
+liftM :: (Monad m) => (a1 -> r) -> m a1 -> m r
+```
 
-##### Another Way of Looking at Monads
+##### Another Way of Looking at Monads (Monad를 바라보는 또 다른 방법)
+* 이제, 우리는 functor와 monad의 관계를 알고 있다.
+* list의 (>>=) 를 다시 보자.
+
+```hs
+instance Monad [] where
+    return x = [x]
+    xs >>= f = concat (map f xs)
+```
+
+* 여기서 f가 a->[a] 이므로, map f xs는 [[a]] 타입이다. 따라서 concat을 이용해서 flatten 되어야 한다.
+* 만약 Monad가 Functor의 subclass였다면?
+	* list의 fmap은 map이 되어야 할 것이므로, map을 fmap 으로 바꿔서 (>>=)을 정의할 수 있다.
+* concat
+	* 아래 2개는 동일
+	* 그 중, 아래 것이 join의 정의
+```hs
+[[a]] -> [a]
+m (m a) -> m a
+```
+* 만약 join과 fmap이 정의되어있다면, (>>=)는 모든 monad에 대해 정의될 필요가 없다. 완벽히 general하므로.   
+
+```hs
+import Prelude hiding ((>>=), return)
+
+class Functor m => AltMonad m where
+    join :: m (m a) -> m a
+    return :: a -> m a
+
+(>>=) :: AltMonad m => m a -> (a -> m b) -> m b
+xs >>= f = join (fmap f xs)
+```
+
+* 물론 (>>=)로 join을 구현하는 것도 가능하다. 어느 것이 더 좋다라고 할 수는 없겠다. 둘은 서로 대체 가능하다.  
+  아래는 Control.Monad 모듈의 join 구현이다.  
+
+```hs
+join :: Monad m => m (m a) -> m a
+join x = x >>= id
+```
+* monadic wrapping layer를 벗길 수 있는 능력은 제한적인 환경에서 유용할 수 있다. 
 
 ### The Monad Laws and Good Coding Style
+* Functors Laws
+
+```hs
+fmap id        ==   id 
+fmap (f . g)   ==   fmap f . fmap g
+```
 
 
+* Monad Laws
+	* 단순화시키면, "monad가 나를 놀래켜서는 안된다." 같은거다.
+
+* 첫 번째 : return is a left identify for (>>=)
+
+```hs
+return x >>= f            ===   f x
+
+; do를 사용한 동일한 표현
+do y <- return x
+   f y                    ===   f x
+```
 
 
+* 두 번째 : return is a right identify for (>>=)
+
+```hs
+m >>= return              ===   m
+
+; do를 사용한 동일한 표현
+do y <- m
+   return y               ===   m
+```
+
+* 세 번째 : associativity 관련하여 아래가 보장되어야 한다.
+
+```hs
+m >>= (\x -> f x >>= g)   ===   (m >>= f) >>= g
+```
+왼쪽 오른쪽을 다시 작성한 버전, 이러고 보니 똑같지 ?!!
+```hs
+; 왼쪽
+m >>= s
+  where s x = f x >>= g
+
+; 오른쪽
+t >>= g
+  where t = m >>= f
+```
+
+* 3번째 법칙 상세
+	* 어떤 3개로 이루어진 action을 쪼갤 수 있다는 말이다.
+	* 또한 다른 것은 그대로 둔 채로 다른 것을 교체하는 것도 가능하다.
+	* 순서도 늘 지켜진다.
+
+
+* extract method 라고 하는 리펙토링 방법과 같다.
+	* 연속된 코드의 일부를 함수로 바꾸고 그 자리에 새로 만든 함수를 호출하도록 리펙토링하는 것
+
+
+* 코드 개선에 대한 통찰을 준다.
+	* 첫 번째와 두 번째는 불필요한 return을 피하게 해준다.
+	* 마지막 것은 복잡한 action을 몇몇의 더 단순화된 것으로 안전하게 리펙토링할 수 있게 해준다.
+
+
+* 컴파일러에 의해 법칙들이 지켜지고 있는지 확인되지 않는다. 작성자가 잘 확인해야 한다.     
