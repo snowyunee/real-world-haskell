@@ -915,6 +915,7 @@ rand :: IO Int
 rand = getStdRandom (randomR (0, maxBound))
 ```
 
+
 System.Random에서 제공하는 class 와 Types
 * RandomGen (type class)
 	* 새로운 Random int value에 대한 소스를 정의할 수 있게 해준다.  <br> true random source가 있는 경우, 이 type class 를 이용해서 정의하면 됨. 
@@ -922,6 +923,7 @@ System.Random에서 제공하는 class 와 Types
 	* standard RandomGen instance, pseudorandom
 * Random (type class)
 	* 특정 타입의 random value를 어떻게 정의할 지, 일반적인 단순한 타입들에 대해서는 미리 정의되어 있다.
+
 
 위의 rand코드는 built-in global random generator (IO monad를 상속받고 있다.)를 이용하고 있다. 
 
