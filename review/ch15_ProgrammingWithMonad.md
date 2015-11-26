@@ -3,15 +3,14 @@
 ## Golfing Practice: Association Lists
 * web server와 client 사이에 주고받는 key-value 쌍의 text로 된 목록 정보
 	* encoding : application/x-www-form-urlencoded
-	* 예)
-```
- name=Attila+%42The+Hun%42&occupation=Khan
-```
-
 	* key-value 쌍들은 &로, key, value 는 = 으로 구분
 	* 애매한 부분 : value가 반드시 존재해야 하는지 여부
 		* value를 Maybe로 표현하면 되겠음.
 		* Maybe를 사용함으로써, "no value" 와 "empty value" 를 구분할 수 있
+	* 예)
+```
+ name=Attila+%42The+Hun%42&occupation=Khan
+```
 * association list
 	* alist라고도 함.
 	* 위에 예를 alist로 표현하면 아래와 같이
@@ -82,20 +81,20 @@ ghci> :type ap
 ap :: (Monad m) => m (a -> b) -> m a -> m b
 ```
 * 이제 MovieReview constructor의 lifting 과정을 보자.
-	1. MovieReview 생성자
-```hs
-MovieReview :: String -> String -> String -> MovieReview
-```
-	2. 동일 표현
-```hs
-MovieReview :: String -> (String -> (String -> MovieReview))
-```
-	3. Maybe 로 lifting
-```hs
-Maybe (String -> (String -> (String -> MovieReview)))
-```
+	* MovieReview 생성자
+	```hs
+	MovieReview :: String -> String -> String -> MovieReview
+	```
+	* 동일 표현
+	```hs
+	MovieReview :: String -> (String -> (String -> MovieReview))
+	```
+	* Maybe 로 lifting
+	```hs
+	Maybe (String -> (String -> (String -> MovieReview)))
+	```
  
-* liftM, ap (여기 되게 어려움.)
+* liftM, ap (이거 어려움.)
 ```hs
 apReview alist =
     MovieReview `liftM` lookup1 "title" alist
