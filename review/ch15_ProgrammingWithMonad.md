@@ -818,10 +818,15 @@ class (Monoid w, Monad m) => MonadWriter w m | m -> w where
 	* 어쩔 수 없이 필요한 기능
 		* 제약을 가한 타입(MonadHandleIO)에서 IO 타입을 꺼내는 함수
 	* 문제
-		* typeclass는 그 타입이 전달되는 모든 함수에 영향을 끼치므로, pure하게 테스트하는 코드를 작성하기 어렵게 된다.
+		* typeclass는 그 타입이 전달되는 모든 함수에 영향을 끼치므로, 모든 MonadHandleIO를 사용한 함수에 대해 pure하게 테스트하는 코드를 작성하기 어렵게 된다.
 	* 해결방안
-		* typaclass에 그 기능을 넣지 말고, 필요한 함수에 그 제약을 추가하도록 구현 변경
-
+		* typaclass에 그 기능(MonadIO, IO를 꺼낼 수 있는 기능)을 넣지 말고, 필요한 함수에만 그 제약을 추가하도록 구현 변경
+		* 이제 MonadIO 제약이 없는 함수에 대해서는 pure하므로, unit test 코드 작성 가능 
+	* 이 해결방안의 문제
+		* MonadHandle 제약만 있는 어떤 깊숙한 함수에서 MonadIO 제약이 필요해지면,  
+	      그 함수가 호출되는 path에 모두 MonadIO 제약을 추가해야 한다.
+	* 그럼 어떤 것을 택해야 하는가?  
+		* 그래도 추론하기 쉽고 테스트하기 쉬운 후자쪽이 좋겠다.  
 * 코드
 
 ```hs
