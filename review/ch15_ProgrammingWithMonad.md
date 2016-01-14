@@ -277,7 +277,9 @@ module Supply
 	* Monad typeclass의 instance
 		* 이를 위한 함수 정의는 State Monad의 함수를 그대로 이용
 		* (>>=), return
-		* GeneralizedNewtypeDeriving
+		* Generalized
+		* 
+		* Deriving
 			* monad를 instatnce하기 위한 boiler plate는 필요없다.
 			* language extention of GHC
 			* newtype으로 선언한 데이터 타입이 typeclass instance를 derive하게 해준다.
@@ -535,20 +537,305 @@ showTwo_class = do
   return (show "a: " ++ show a ++ ", b: " ++ show b)
 ```
 
-## The Reader Monad
+## The Reader Monad (Reader Monad)
+* immutable state 로 작업하기 위해 (configuration data 같은..)
 
-## A Return to Automated Deriving
+```hs
+-- e : immutable state (ex: environment)
+-- a : result data
+newtype Reader e a = R { runReader :: e -> a }
 
+instance Monad (Reader e) where
+    --  return           :: a -> m a
+    -- e 에 관계없이 고정된 값 a 를 제공함.
+    return a = R $ \_ -> a
+    --  (>>=)            :: m a -> (a -> m b) -> m b
+    m >>= k = R $ \r -> runReader (k (runReader m r)) r
 
+-- 
+ask :: Reader e e
+ask = R id
+```
+* 어떻게 돌아가는 것인지 아직 이해가 가지 않음.
+* 실행 예
 
-## Hiding the IO Monad
+```hs
+ghci> runReader (ask >>= \x -> return (x * 3)) 2
+Loading package old-locale-1.0.0.0 ... linking ... done.
+Loading package old-time-1.0.0.0 ... linking ... done.
+Loading package random-1.0.0.0 ... linking ... done.
+6
+```
+
+* standard mtl library에 Reader Monad가 구현되어 있음
+	* Control.Monad.Reader 모듈이 있음
+* Reader monad의 제작동기
+	* 그렇게 유용해 보이지 않을 수 있다.
+	* 볶잡한 프로그램에서 유용함을 알게된다.
+	* 프로그램의 깊숙한 곳까지 설정값을 넘기려면 프로그램을 많이 뜯어고쳐야 할수도 있는데,  
+	  이 때 Reader monad를 사용하면, 중간 함수들은 그 존재도 몰라도 되므로 이런 위험이 적다.
+	* 그 필요성을 18장에서 자세히 보게된다.
+		* 모나드들을 이용해서 새 모나드를 조합할꺼다. 
+
+## A Return to Automated Deriving(자동 deriving)
+
+* Reader monad를 이용해서 MonadSuppy를 만들어보자.
+
+```hs
+newtype MySupply e a = MySupply { runMySupply :: Reader e a }
+    deriving (Monad)
+
+instance MonadSupply e (MySupply e) where
+    next = MySupply $ do
+             v <- ask
+             return (Just v)
+
+    -- more concise:
+    -- next = MySupply (Just `liftM` ask)
+
+-- 2번 가져와서 곱해주는 함수
+xy :: (Num s, MonadSupply s m) => m s
+xy = do
+  Just x <- next
+  Just y <- next
+  return (x * y)
+```
+
+* 실행 예
+	* 예전 구현은 서로 다른 랜덤 값을 뽑아주고
+	* 이번꺼는 같은 값을 제공한다. 
+
+```hs
+ghci> (fst . runSupply xy) `fmap` randomsIO
+-15697064270863081825448476392841917578
+ghci> (fst . runSupply xy) `fmap` randomsIO
+17182983444616834494257398042360119726
+
+ghci> runMS xy 2
+4
+ghci> runMS xy 2
+4
+```
+
+* Haskell에서의 monad들은 interface와 implementation으로 나누어진다
+	* MonadSupply typeclass와 Supply monad 처럼
+	* MonadState typeclass, State type 처럼
+		* get, put이 State monad의 method라고 했지만, 사실 MonadState typeclass의 method인 것이다.
+	* Reader monad와 MonadReader typeclass도 역시 그러하다.
+
+## Hiding the IO Monad (IO Monad 제약하기)
+* IO monad는 뭐든할 수 있어서 위험하다.
+* 어떻게 local file system에만 접근하고, network에는 접근하지 않는다는 것을 보장할 수 있을까?
+	* IO monad를 그대로 써서는 이러한 보장을 할 수 없을 것이다. 
+
+### Using a newtype (newtype 이용하기)
+* HandleIO 모듈 만들기
+	* newtype으로 IO monad를 감싸서 HandleIO type을 만듦
+	* HandleIO module에서 type ctor만 노출하고 value ctor은 노출하지 않음
+	* file io 를 다루는 함수들을 HandleIO 타입을 이용하여 구현
+* 구현  
+
+```hs
+-- file: ch15/HandleIO.hs
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
+module HandleIO
+    (
+      HandleIO
+    , Handle
+    , IOMode(..)
+    , runHandleIO
+    , openFile
+    , hClose
+    , hPutStrLn
+    ) where
+    
+import System.IO (Handle, IOMode(..))
+import qualified System.IO
+
+-- 질문??? : HandleIO (IO a) 이렇게 안만들어도 이것인 줄 아는 것인가?   
+newtype HandleIO a = HandleIO { runHandleIO :: IO a }
+    deriving (Monad)
+
+openFile :: FilePath -> IOMode -> HandleIO Handle
+openFile path mode = HandleIO (System.IO.openFile path mode)
+
+hClose :: Handle -> HandleIO ()
+hClose = HandleIO . System.IO.hClose
+
+hPutStrLn :: Handle -> String -> HandleIO ()
+hPutStrLn h s = HandleIO (System.IO.hPutStrLn h s)
+
+safeHello :: FilePath -> HandleIO ()
+safeHello path = do
+  h <- openFile path WriteMode
+  hPutStrLn h "hello world"
+  hClose h
+
+```
+
+* 실행 예
+	* HnadleIO를 받는 removeFile 함수는 없기 때문에 에러가 발생한다.  
+	  (원하는 데로 잘 구현되었다.) 
+
+```hs
+ghci> :load HandleIO
+[1 of 1] Compiling HandleIO         ( HandleIO.hs, interpreted )
+Ok, modules loaded: HandleIO.
+ghci> runHandleIO (safeHello "hello_world_101.txt")
+Loading package old-locale-1.0.0.0 ... linking ... done.
+Loading package old-time-1.0.0.0 ... linking ... done.
+Loading package filepath-1.1.0.0 ... linking ... done.
+Loading package directory-1.0.0.0 ... linking ... done.
+Loading package mtl-1.1.0.0 ... linking ... done.
+ghci> :m +System.Directory
+ghci> removeFile "hello_world_101.txt"
+
+ghci> runHandleIO (safeHello "goodbye" >> removeFile "goodbye")
+
+<interactive>:1:36:
+    Couldn't match expected type `HandleIO a'
+           against inferred type `IO ()'
+    In the second argument of `(>>)', namely `removeFile "goodbye"'
+    In the first argument of `runHandleIO', namely
+        `(safeHello "goodbye" >> removeFile "goodbye")'
+    In the expression:
+        runHandleIO (safeHello "goodbye" >> removeFile "goodbye")
+```
 
 ### Designing for Unexpected Uses
 
-### Using Typeclasses
+* HandleIO 에서 원래 IO를 가져올 수 있는 방법이 필요할 수 있다.
+	* IO Monad 제약은 일반적인 사용에서 오용을 막는 것이지 의도한 사용 외엔 완전히 불가하게 하는 것이 아니었다.
+	* Control.Monad.Trans 모듈에 MonadIO typeclass 가 구현하고 있다.
+* MonadIO의 liftIO를 이용하여 removeFile을 사용할 수 있게 수정하였다. 
+
+```hs
+ghci> :m +Control.Monad.Trans
+ghci> :info MonadIO
+class (Monad m) => MonadIO m where liftIO :: IO a -> m a
+  	-- Defined in Control.Monad.Trans
+instance MonadIO IO -- Defined in Control.Monad.Trans
+
+-- file: ch15/HandleIO.hs
+import Control.Monad.Trans (MonadIO(..))
+
+instance MonadIO HandleIO where
+    liftIO = HandleIO
+
+-- file: ch15/HandleIO.hs
+tidyHello :: FilePath -> HandleIO ()
+tidyHello path = do
+  safeHello path
+  liftIO (removeFile path)
+``` 
+
+### Using Typeclasses (typeclass를 사용한 인터페이스 분리)
+* 인터페이스 분리
+	* MonadHandle typeclass 
+		* monad type, file handle type 2가지 모두 추상화
+		* monad type 에 따라 file handle type이 1가지로 정해짐
+			* => ? System.IO 타입 봤지만 잘 모르겠다.  
+			  => 컴파일러에게 알려주는거란다. 1개만 있다는 것을.. 2개 있으면 컴파일 에러 남.
+	* IO 를 MonadHandle h m 의 instance로 만들어서 ghci에서 그냥 호출이 가능하다.
+	* 구현과 인터페이스 분리의 일반적인 장점에 대해 서술..
 
 ### Isolation and Testing
+* safeHello 가 IO를 사용하지 않으므로, I/O를 수행하지 않는 pure 함수로 변경도 가능하다.
+	* file IO 를 수행하지 않고, file 관련 이벤트를 모두 로깅하는 것으로 수정해서 디버깅 용도로 사용해보자.
+* Writer Monad
+	* Control.Monad.Writer 에 정의
+	* typeclass MonadWriter의 instance Writer
+	* tell 이라는 method가 있다.
+		* =>? tell의 정의가 뭘 의미하는 것인지 모르겠다.
+
+```hs
+data Event = Open FilePath IOMode
+           | Put String String
+           | Close String
+           | GetContents String
+             deriving (Show)
+
+ghci> :m +Control.Monad.Writer
+ghci> :type tell
+tell :: (MonadWriter w m) => w -> m ()
+
+newtype WriterIO a = W { runW :: Writer [Event] a }
+    deriving (Monad, MonadWriter [Event])
+
+runWriterIO :: WriterIO a -> (a, [Event])
+runWriterIO = runWriter . runW
+```
+
+* 실행 예
+
+```hs
+ghci> :load WriterIO
+[1 of 3] Compiling MonadHandle      ( MonadHandle.hs, interpreted )
+[2 of 3] Compiling SafeHello        ( SafeHello.hs, interpreted )
+[3 of 3] Compiling WriterIO         ( WriterIO.hs, interpreted )
+Ok, modules loaded: SafeHello, MonadHandle, WriterIO.
+ghci> runWriterIO (safeHello "foo")
+((),[Open "foo" WriteMode,Put "foo" "hello world",Put "foo" "\n",Close "foo"])
+```
+
+* 참고: Control.Monad.MonadWriter
+
+```hs
+class (Monoid w, Monad m) => MonadWriter w m | m -> w where
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 707
+    {-# MINIMAL (writer | tell), listen, pass #-}
+#endif
+    -- | @'writer' (a,w)@ embeds a simple writer action.
+    writer :: (a,w) -> m a
+    writer ~(a, w) = do
+      tell w
+      return a
+
+    -- | @'tell' w@ is an action that produces the output @w@.
+    tell   :: w -> m ()
+    tell w = writer ((),w)
+
+    -- | @'listen' m@ is an action that executes the action @m@ and adds
+    -- its output to the value of the computation.
+    listen :: m a -> m (a, w)
+    -- | @'pass' m@ is an action that executes the action @m@, which
+    -- returns a value and a function, and returns the value, applying
+    -- the function to the output.
+    pass   :: m (a, w -> w) -> m a
+```
 
 ### The Writer Monad and Lists
+* Writer monad의 monoid type w
+	* tell 할 때마다 mappend를 통해 누적한다.  
+	  [] 는 mappend 성능이 좋지 않으므로, 앞에서 설명한 WriterIO 는 실제 서비스용 코드로 적합하지 않다.
+	*  대안을 사용해라
+		* "Taking Advantage of Functions as Data" 에서 설명한 것이나  
+		  Data.Sequece 모듈의 Seq type : "General-Purpose Sequences" 에서 설명한 것
 
 ### Arbitrary I/O Revisited
+* IO 제약을 typecalss를 이용해서 이용하는 경우
+	* 어쩔 수 없이 필요한 기능
+		* 제약을 가한 타입(MonadHandleIO)에서 IO 타입을 꺼내는 함수
+	* 문제
+		* typeclass는 그 타입이 전달되는 모든 함수에 영향을 끼치므로, pure하게 테스트하는 코드를 작성하기 어렵게 된다.
+	* 해결방안
+		* typaclass에 그 기능을 넣지 말고, 필요한 함수에 그 제약을 추가하도록 구현 변경
+
+* 코드
+
+```hs
+class (MonadHandle h m, MonadIO m) => MonadHandleIO h m | m -> h
+
+instance MonadHandleIO System.IO.Handle IO
+
+tidierHello :: (MonadHandleIO h m) => FilePath -> m ()
+tidierHello path = do
+  safeHello path
+  liftIO (removeFile path)
+
+tidyHello :: (MonadIO m, MonadHandle h m) => FilePath -> m ()
+tidyHello path = do
+  safeHello path
+  liftIO (removeFile path)
+```
